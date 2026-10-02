@@ -1,0 +1,34 @@
+name: local-graph-builder
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    ports: ["127.0.0.1:7475:7474", "127.0.0.1:7688:7687"]
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    volumes: [graph-data:/data]
+  backend:
+    build: ./backend
+    env_file: backend/.env
+    ports: ["127.0.0.1:8000:8000"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    command: ["gunicorn", "score:app", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "600"]
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BACKEND_API_URL: http://localhost:8000
+        VITE_REACT_APP_SOURCES: local
+        VITE_SKIP_AUTH: "true"
+        VITE_ENV: DEV
+        VITE_LLM_MODELS: openrouter_gpt_5_mini
+        VITE_CHAT_MODES: vector,graph_vector,graph
+        VITE_TOKENS_PER_CHUNK: "200"
+        VITE_CHUNK_OVERLAP: "20"
+        VITE_CHUNK_TO_COMBINE: "1"
+    ports: ["127.0.0.1:8081:8080"]
+volumes:
+  graph-data:
